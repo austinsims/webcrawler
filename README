@@ -1,0 +1,23 @@
+
+------------------------
+CS390 Web Crawler Project
+Computer Science Department
+Purdue University
+Instructor: Gustavo Rodriguez-Rivera
+-------------------------
+
+Use these sources to start your Web crawler. The files
+are provided "AS IS". You need to modify them and add more functionality
+to implement your web crawler.
+
+The files compile.bat and run.bat can be used to compile
+and run the example crawler.
+
+You need to modify these files if your JDK is not in
+C:\jdk1.6.0_18\bin.
+
+Open a Windows Command Prompt Window and type
+
+compile.bat
+run.bat
+
