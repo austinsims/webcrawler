@@ -1,8 +1,15 @@
-import java.io.*;
-import java.net.*;
-import java.util.regex.*;
-import java.sql.*;
-import java.util.*;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Crawler
 {
@@ -49,12 +56,13 @@ public class Crawler
         	stat.executeUpdate("CREATE TABLE URLS (urlid INT, url VARCHAR(512), description VARCHAR(200))");
 	}
 
-	public boolean urlInDB(String urlFound) throws SQLException, IOException {
+	public boolean isURLInDB(String url) throws SQLException, IOException {
          	Statement stat = connection.createStatement();
-		ResultSet result = stat.executeQuery( "SELECT * FROM urls WHERE url LIKE '"+urlFound+"'");
+		//ResultSet result = stat.executeQuery( "SELECT * FROM url WHERE url LIKE '"+urlFound+"'");
+		ResultSet result = stat.executeQuery(String.format("SELECT COUNT(*) FROM url WHERE url LIKE '%s';", url));
 
 		if (result.next()) {
-	        	System.out.println("URL "+urlFound+" already in DB");
+	        	System.out.println("URL "+url+" already in DB");
 			return true;
 		}
 	       // System.out.println("URL "+urlFound+" not yet in DB");
@@ -62,46 +70,91 @@ public class Crawler
 	}
 
 	public void insertURLInDB( String url) throws SQLException, IOException {
-         	Statement stat = connection.createStatement();
-		String query = "INSERT INTO urls VALUES ('"+urlID+"','"+url+"','')";
-		//System.out.println("Executing "+query);
+		Statement stat = connection.createStatement();
+		String query = String.format("INSERT INTO url VALUES (NULL, '%s', NULL);", url);
 		stat.executeUpdate( query );
-		urlID++;
 	}
 
-/*
-	public String makeAbsoluteURL(String url, String parentURL) {
-		if (url.indexOf(":")<0) {
+	/** Broken */
+	public static String makeAbsoluteURL(String relativeURL, String parentURL) {
+		StringBuilder absoluteURL = new StringBuilder();
+		
+		if (relativeURL.contains(":")) {
 			// the protocol part is already there.
-			return url;
+			return relativeURL;
 		}
 
-		if (url.length > 0 && url.charAt(0) == '/') {
+		if (relativeURL.length() > 0 && relativeURL.startsWith("/") ) {
 			// It starts with '/'. Add only host part.
-			int posHost = url.indexOf("://");
+			int posHost = parentURL.indexOf("://");
 			if (posHost <0) {
-				return url;
+				return relativeURL;
 			}
-			int posAfterHist = url.indexOf("/", posHost+3);
-			if (posAfterHist < 0) {
-				posAfterHist = url.Length();
+			int posAfterHost = relativeURL.indexOf("/", posHost+3);
+			if (posAfterHost < 0) {
+				posAfterHost = relativeURL.length();
 			}
-			String hostPart = url.substring(0, posAfterHost);
-			return hostPart + "/" + url;
-		} 
-
-		// URL start with a char different than "/"
-		int pos = parentURL.lastIndexOf("/");
-		int posHost = parentURL.indexOf("://");
-		if (posHost <0) {
-			return url;
+			String hostPart = relativeURL.substring(0, posAfterHost);
+			absoluteURL.append(hostPart + "/" + relativeURL);
+		} else {  // URL starts with a char other than "/"
+			// below code is not complete and doesn't really make sense
+			/*
+			int pos = parentURL.lastIndexOf("/");
+			int posHost = parentURL.indexOf("://");
+			if (posHost <0) {
+				return relativeURL;
+			}
+			*/
 		}
-		
-		
-		
-
+		return absoluteURL.toString();
 	}
-*/
+	
+    void startCrawl() {
+        // TODO: Open the database
+        
+        //for every url in url-list..
+        for (int i=0; true; i++){
+        	// TODO: Insert into url table
+           
+        }
+    }
+    
+//    void crawl() {
+//    	while (NextURLIDScanned < NextURLID) {
+//    		urlIndex = NextURLIDScanned;
+//    		// TODO: Fetch the url1 entry in urlIndex
+//    		
+//    		NextURLIDScanned++;
+//    		
+//    		// TODO: Get the first 100 characters or less of the document from url1 without tags.
+//    		// Add this description to the URL record in the URL table.
+//    		
+//    		// TODO: For each url2 in the links in the anchor tags of this document...
+//    		for (/* anchor_href : tags_in_doc */) {
+//    			// TODO: fetch anchor_href
+//    			// TODO: If it is not html/text, continue
+//    			if (/* not html/text*/ false) continue;
+//    			
+//    			if (NextURLID < MaxURLs && !urlInDB(anchor_href)) {
+//    				// TODO: put (NextURLID, anchor_href) into url table
+//    				
+//    				NextURLID++;
+//    			}
+//    		}
+//    		
+//    		// TODO: Get the document in url1 without tags
+//    		// for each different word in the document... 
+//    		/* NOTE: remove words between...
+//    			<script> ... </script>
+//    			<!-- and -->
+//    			& and ;
+//    		*/
+//    		for (/* String word : document.text.split(' ') */) {
+//    			// TODO: In Word table, get the (word, URLList) for this word and append urlIndex at the end of URLList
+//    			//       or create a new (word, URLList) if the entry does not exist
+//    		}
+//    	}
+//    }
 
    	public void fetchURL(String urlScanned) {
 		try {
@@ -134,7 +187,7 @@ public class Crawler
 				System.out.println(urlFound);
 
 				// Check if it is already in the database
-				if (!urlInDB(urlFound)) {
+				if (!isURLInDB(urlFound)) {
 					insertURLInDB(urlFound);
 				}				
 	
@@ -161,6 +214,6 @@ public class Crawler
 		catch( Exception e) {
          		e.printStackTrace();
 		}
-    	}
+    }
 }
 
