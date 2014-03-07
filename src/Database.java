@@ -125,20 +125,18 @@ public class Database {
 		s.executeUpdate(String.format("INSERT IGNORE INTO word VALUES ('%s', %d)", word, urlID));
 	}
 	
-	public Set<URL> search(String query) throws SQLException {
-		System.out.println("in search");
+	public Set<URL> search(String keywords) throws SQLException {
 		Set<URL> results = null;
 		boolean firstWord = true;
-		for (String word : query.split(" ")) {
-			System.out.println("getting pages with " + word);
+		for (String word : keywords.split(" ")) {
 			Statement st = conn.createStatement();
-			ResultSet rs = st.executeQuery(String.format(
+			String query = String.format(
 					"SELECT url " + 
 					"FROM url JOIN word ON (url.urlid = word.urlid) " +
-					"WHERE word LIKE '%s'",
-					word));
+					"WHERE word LIKE '%s';",
+					word);
+			ResultSet rs = st.executeQuery(query);
 			Set<URL> s = new HashSet<URL>();
-			rs.first();
 			while (rs.next()) {
 				try {
 					s.add(new URL(rs.getString(1)));
