@@ -13,6 +13,7 @@ import java.util.Set;
 
 public class Database {
 	Connection conn;
+	String dbName;
 
 	/**
 	 * Create a Database object from a properties file containing the info to
@@ -41,41 +42,37 @@ public class Database {
 		}
 	}
 	
-	Database(String propFile) throws IOException, SQLException {
-		Properties props = new Properties();
-		FileInputStream in = new FileInputStream(propFile);
-		props.load(in);
+	Database(Properties props) throws IOException, SQLException {
 
 		String url = props.getProperty("jdbc.url");
 		String user = props.getProperty("jdbc.username");
 		String password = props.getProperty("jdbc.password");
+		dbName = props.getProperty("jdbc.db");
 
 		conn = DriverManager.getConnection(url, user, password);
 		
 		// Set up schema if necessary
-		if (!doesDatabaseExist("crawler")) {
+		if (!doesDatabaseExist(dbName)) {
 			setupSchema();
 		} else {
-			conn.createStatement().execute("use crawler;");
-		}
-		
-		in.close();
+			conn.createStatement().execute(String.format("use %s;",dbName));
+		}		
 	}
 	
 	Database(String url, String user, String password) throws SQLException {
 		conn = DriverManager.getConnection(url, user, password);
 		
 		// Set up schema if necessary
-		if (!doesDatabaseExist("crawler")) {
+		if (!doesDatabaseExist(dbName)) {
 			setupSchema();
 		}
-		conn.createStatement().execute("use database crawler;");
+		conn.createStatement().execute(String.format("use database %s;", dbName));
 	}
 	
 	private void setupSchema() throws SQLException {
 		Statement s = conn.createStatement();
-		s.addBatch("CREATE DATABASE crawler;");
-		s.addBatch("use crawler;");
+		s.addBatch(String.format("CREATE DATABASE %s;",dbName));
+		s.addBatch(String.format("use %s;",dbName));
 		s.addBatch("CREATE TABLE url ( urlid INT NOT NULL AUTO_INCREMENT, url VARCHAR(255) UNIQUE NOT NULL, description TEXT, PRIMARY KEY (urlid));");
 		s.addBatch("CREATE TABLE word ( word VARCHAR(50) NOT NULL, urlid INT NOT NULL, FOREIGN KEY (urlid)  REFERENCES url(urlid), PRIMARY KEY (word, urlid) );");
 		s.executeBatch();
@@ -87,7 +84,7 @@ public class Database {
 	 */
 	public void reset() throws SQLException {
 		Statement s = conn.createStatement();
-		s.execute("DROP DATABASE crawler");
+		s.execute(String.format("DROP DATABASE %s",dbName));
 		setupSchema();
 	}
 	
