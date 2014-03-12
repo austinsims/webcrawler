@@ -59,15 +59,16 @@ public class Database {
 		}		
 	}
 	
-	Database(String url, String user, String password) throws SQLException {
+	Database(String url, String user, String password, String dbName) throws SQLException {
 		conn = DriverManager.getConnection(url, user, password);
-		
 		// Set up schema if necessary
 		if (!doesDatabaseExist(dbName)) {
 			setupSchema();
+		} else {
+			conn.createStatement().execute(String.format("use %s;",dbName));
 		}
-		conn.createStatement().execute(String.format("use database %s;", dbName));
 	}
+	
 	
 	private void setupSchema() throws SQLException {
 		Statement s = conn.createStatement();
