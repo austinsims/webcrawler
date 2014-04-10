@@ -42,6 +42,7 @@ public class CrawlerTest {
         assertTrue(Crawler.isURLAbsolute("ftp://example.com/file.txt"));
         assertFalse(Crawler.isURLAbsolute("/myfolder/test.txt"));
         assertFalse(Crawler.isURLAbsolute("test"));
+        assertTrue(Crawler.isURLAbsolute("https://www.cs.purdue.edu//"));
 	}
 	
 	@Test
@@ -69,6 +70,32 @@ public class CrawlerTest {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+	
+	@Test
+	public void testOnlyTextHtml() throws IOException, SQLException {
+			
+		
+		crawler.crawl();
+		ResultSet rs;
+		int c;
+		
+		c = 0;
+		rs = conn.createStatement().executeQuery("SELECT * FROM url WHERE url LIKE 'http://scm-l3.technorati.com/13/08/12/77049/Mars-3.jpg?t=20130812070610'");
+		while (rs.next()) c++;
+		assertEquals(0,c);
+		
+		c = 0;
+		rs = conn.createStatement().executeQuery("SELECT * FROM url WHERE url LIKE 'http://t0.gstatic.com/images?q=tbn:ANd9GcTPq3Dv_mAVWEZycg4jhWmCi_6hUmjgyvpanbSpuYbyWo5Kk8fJ'");
+		while (rs.next()) c++;
+		assertEquals(0,c);
+		
+		c = 0;
+		rs = conn.createStatement().executeQuery("SELECT * FROM url WHERE url LIKE 'http://upload.wikimedia.org/wikipedia/commons/b/bc/Venuspioneeruv.jpg'");
+		while (rs.next()) c++;
+		assertEquals(0,c);
+		
+		
 	}
 	
 	@Test

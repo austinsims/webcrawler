@@ -5,8 +5,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
-import java.net.UnknownServiceException;
 import java.net.URL;
+import java.net.URLConnection;
+import java.net.UnknownServiceException;
 import java.sql.SQLException;
 import java.util.LinkedList;
 import java.util.List;
@@ -117,6 +118,11 @@ public class Crawler {
 			InputStreamReader in = null;
 			try {
 				in = new InputStreamReader(url.openStream());
+				URLConnection conn = url.openConnection();
+				conn.connect();
+				String contentType = conn.getContentType();
+				if (!contentType.contains("text/html"))
+					return;
 			} catch (UnknownServiceException e) {
 				System.out.println(url + " not found.");
 				return;
@@ -152,25 +158,21 @@ public class Crawler {
 				// If URL is not absolute, convert it
 				if (!isURLAbsolute(foundAddress))
 					foundAddress = (new URL(url, foundAddress)).toString();
+				
+				URL newURL = new URL(foundAddress);
 				// Check against rules and insert if pass
-				if (pass(foundAddress)) {
-					urls.add(new URL(foundAddress));
-
+				if (!urls.contains(newURL) && pass(foundAddress)) {
+					urls.add(newURL);
 				}
 
 			}
 
-			// If the DB already has this url, don't parse its words (but we still want the URLs, as done above)
-			if (db.hasURL(url.toString())) {
-				return;
-			} else { 
-				// Link words in this page to its url.
-				Pattern p = Pattern.compile("\\b\\w+\\b");
-				Matcher m = p.matcher(text);
-				while (m.find()) {
-					String word = text.substring(m.start(), m.end());
-					db.insertWord(word, urlID);
-				}
+			// Link words in this page to its url.
+			Pattern p = Pattern.compile("\\b\\w+\\b");
+			Matcher m = p.matcher(text);
+			while (m.find()) {
+				String word = text.substring(m.start(), m.end());
+				db.insertWord(word, urlID);
 			}
 
 		} catch (Exception e) {
@@ -209,8 +211,10 @@ public class Crawler {
 
 	public void crawl() throws MalformedURLException {
 		int urlsCrawled = 0;
-		while (urlsCrawled < max && urls.size() > 0) {
-			fetch(urls.remove(0));
+		
+		while (urlsCrawled < max && urls.size() > 0 && urlsCrawled < urls.size()) {
+			//fetch(urls.remove(0));
+			fetch(urls.get(urlsCrawled));
 			urlsCrawled++;
 		}
 	}
@@ -241,6 +245,29 @@ public class Crawler {
 				@Override
 				public boolean check(String url) {
 					return !url.contains("javascript:");
+				}
+			});
+			
+			// Only crawl cs.purdue.edu links
+			/*
+			crawler.addRule(new Rule() {
+				@Override
+				public boolean check(String url) {
+					return url.contains("cs.purdue.edu");
+				}
+			});
+			*/
+			
+			crawler.addRule(new Rule() {
+				@Override
+				public boolean check(String url) {
+					return !(
+							url.endsWith(".jpg")||
+							url.endsWith(".pdf")||
+							url.endsWith(".gif")||
+							url.endsWith(".png")||
+							url.endsWith(".zip")
+							);
 				}
 			});
 
