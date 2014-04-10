@@ -1,4 +1,7 @@
+package edu.purdue.austinsims;
+
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
@@ -8,6 +11,7 @@ import java.sql.SQLException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,7 +30,10 @@ public class Crawler {
 
 	/**
 	 * Create a new crawler from a properties file
-	 * @param propFile must contain jdbc.url, jdbc.db, jdbc.username, jdbc.password, crawler.maxurls, crawler.domain and crawler.root
+	 * 
+	 * @param propFile
+	 *            must contain jdbc.url, jdbc.db, jdbc.username, jdbc.password,
+	 *            crawler.maxurls, crawler.domain and crawler.root
 	 * @throws IOException
 	 * @throws SQLException
 	 * @throws MalformedURLException
@@ -38,31 +45,41 @@ public class Crawler {
 		in.close();
 		init();
 	}
-	
+
 	/**
 	 * Create a new crawler with manually set parameters
-	 * @param server hostname or IP of MySQL server
-	 * @param dbName name of MySQL database to use
-	 * @param user MySQL username
-	 * @param pass MySQL password
-	 * @param maxURLs max number of pages to index for search
-	 * @param domain optional domain name (or path, like catb.org/jargon) to restrict crawl to 
-	 * @param crawlRoot first URL to visit
-	 * @throws SQLException 
-	 * @throws IOException 
+	 * 
+	 * @param server
+	 *            hostname or IP of MySQL server
+	 * @param dbName
+	 *            name of MySQL database to use
+	 * @param user
+	 *            MySQL username
+	 * @param pass
+	 *            MySQL password
+	 * @param maxURLs
+	 *            max number of pages to index for search
+	 * @param domain
+	 *            optional domain name (or path, like catb.org/jargon) to
+	 *            restrict crawl to
+	 * @param crawlRoot
+	 *            first URL to visit
+	 * @throws SQLException
+	 * @throws IOException
 	 */
-	public Crawler(String server, String dbName, String user, String pass, int maxURLs, String domain, String crawlRoot) throws IOException, SQLException {
+	public Crawler(String server, String dbName, String user, String pass, int maxURLs, String domain, String crawlRoot)
+			throws IOException, SQLException {
 		props = new Properties();
 		props.setProperty("jdbc.url", server);
 		props.setProperty("jdbc.db", dbName);
 		props.setProperty("jdbc.username", user);
 		props.setProperty("jdbc.password", pass);
-		props.setProperty("crawler.maxurls", String.format("%d",maxURLs));
+		props.setProperty("crawler.maxurls", String.format("%d", maxURLs));
 		props.setProperty("crawler.domain", domain);
 		props.setProperty("crawler.root", crawlRoot);
 		init();
 	}
-	
+
 	public void init() throws IOException, SQLException {
 		db = new Database(props);
 		urls = new LinkedList<URL>();
@@ -72,12 +89,12 @@ public class Crawler {
 		domain = props.getProperty("crawler.domain");
 		rules = new LinkedList<Rule>();
 	}
-	
+
 	public void close() throws SQLException {
 		db.conn.close();
 	}
 
-	public static boolean isURLAbsolute(String url) {
+	public static boolean isURLAbsolute(String url) { 
 		return url.matches("^[a-zA-Z]+://.*");
 	}
 
@@ -96,15 +113,21 @@ public class Crawler {
 
 	public void fetch(URL url) {
 		try {
-			// Insert this URL into the database.
-			int urlID = db.insertURL(url.toString());
-
 			// Get the page contents.
 			InputStreamReader in = null;
 			try {
 				in = new InputStreamReader(url.openStream());
 			} catch (UnknownServiceException e) {
-				return; // just don't deal with this url.
+				System.out.println(url + " not found.");
+				return;
+			} catch (FileNotFoundException e) {
+				System.out.println(url + " not found.");
+				return;
+			} catch (MalformedURLException e) {
+				System.out.println(url + " is malformed.");
+				return;
+			} catch (IOException e) {
+				System.out.println(url + " not crawled:" + e.getMessage());
 			}
 			StringBuilder page = new StringBuilder();
 			int c;
@@ -112,14 +135,11 @@ public class Crawler {
 				page.append((char) c);
 			}
 
-			// Link words in this page to its url.
+			// Insert the URL into the database, along with its description
 			String text = Jsoup.parse(page.toString()).text();
-			Pattern p = Pattern.compile("\\b\\w+\\b");
-			Matcher m = p.matcher(text);
-			while (m.find()) {
-				String word = text.substring(m.start(), m.end());
-				db.insertWord(word, urlID);
-			}
+			String description = firstNCharRoundToWord(text.toString(), 100);
+			int urlID = db.insertURL(url.toString(), description);
+			System.out.printf("%d\t%s\n", urlID, url.toString());
 
 			// Find URLs.
 			Pattern pattern = Pattern
@@ -128,17 +148,31 @@ public class Crawler {
 			while (matcher.find()) {
 				String match = page.substring(matcher.start(), matcher.end());
 				String foundAddress = matcher.group(1).replaceAll("\"", "");
-				if (!db.hasURL(foundAddress)) {
-					// If URL is not absolute, convert it
-					if (!isURLAbsolute(foundAddress))
-						foundAddress = (new URL(url, foundAddress)).toString();
-					// Check against rules and insert if pass
-					if (pass(foundAddress)) {
-						urls.add(new URL(foundAddress));
-						
-					}
+
+				// If URL is not absolute, convert it
+				if (!isURLAbsolute(foundAddress))
+					foundAddress = (new URL(url, foundAddress)).toString();
+				// Check against rules and insert if pass
+				if (pass(foundAddress)) {
+					urls.add(new URL(foundAddress));
+
 				}
-			}			
+
+			}
+
+			// If the DB already has this url, don't parse its words (but we still want the URLs, as done above)
+			if (db.hasURL(url.toString())) {
+				return;
+			} else { 
+				// Link words in this page to its url.
+				Pattern p = Pattern.compile("\\b\\w+\\b");
+				Matcher m = p.matcher(text);
+				while (m.find()) {
+					String word = text.substring(m.start(), m.end());
+					db.insertWord(word, urlID);
+				}
+			}
+
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -146,12 +180,26 @@ public class Crawler {
 
 	}
 
+	private String firstNCharRoundToWord(String string, int n) {
+		StringBuilder sb = new StringBuilder();
+		Scanner scan = new Scanner(string);
+		int charCount = 0;
+		while (scan.hasNext() && charCount <= n) {
+			String next = scan.next();
+			sb.append(next);
+			sb.append(" ");
+			charCount += next.length();
+		}
+		return sb.toString();
+	}
+
 	/**
 	 * Determine whether this URL passes the rules of the crawler.
 	 */
 	private boolean pass(String url) {
 		// TODO Auto-generated method stub
-		if (rules == null) return true;
+		if (rules == null)
+			return true;
 		boolean pass = true;
 		for (Rule r : rules) {
 			pass = pass && r.check(url);
@@ -187,8 +235,16 @@ public class Crawler {
 					return !url.contains("#");
 				}
 			});
-			
-			// crawler.restrictToDomain(true);
+
+			// Don't crawl javascript:... links
+			crawler.addRule(new Rule() {
+				@Override
+				public boolean check(String url) {
+					return !url.contains("javascript:");
+				}
+			});
+
+			crawler.restrictToDomain(true);
 			crawler.crawl();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block

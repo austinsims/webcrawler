@@ -1,3 +1,4 @@
+package edu.purdue.austinsims;
 /**
  * Determine whether or not a URL should be included in a crawl. 
  */

@@ -1,9 +1,10 @@
-import java.io.FileInputStream;
+package edu.purdue.austinsims;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -101,18 +102,21 @@ public class Database {
 	}
 	
 	/**
-	 * Insert new url without a description and return its id.
+	 * Insert new url and return its id.
+	 * If the URL is already in the database, just return its ID. 
 	 */
-	public int insertURL(String url) throws SQLException {
+	public int insertURL(String url, String description) throws SQLException {
 		if (hasURL(url)) {
 			Statement s = conn.createStatement();
 			ResultSet rs = s.executeQuery(String.format("SELECT urlid FROM url WHERE url LIKE '%s'", url));
 			rs.first();
 			return rs.getInt(1);
 		} else {
-			Statement s = conn.createStatement();
-			s.executeUpdate(String.format("INSERT INTO url VALUES (NULL, '%s', NULL)", url), Statement.RETURN_GENERATED_KEYS);
-			ResultSet genKeys = s.getGeneratedKeys();
+			PreparedStatement pstmt = conn.prepareStatement("INSERT INTO url VALUES (NULL, ?, ?)", Statement.RETURN_GENERATED_KEYS);
+			pstmt.setString(1, url);
+			pstmt.setString(2, description);
+			pstmt.executeUpdate();
+			ResultSet genKeys = pstmt.getGeneratedKeys();
 			genKeys.first();
 			return genKeys.getInt(1);
 		}
